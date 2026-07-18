@@ -9,6 +9,7 @@ from fastapi.staticfiles import StaticFiles
 
 from . import database as db
 from .ai_engine import ai_available, generate_proposal_ai
+from .analytics import compute_analytics
 from .config import EXPORTS_DIR
 from .export_docx import export_proposal_docx
 from .export_xlsx import export_boq_xlsx
@@ -137,6 +138,33 @@ def post_library(entry: dict):
 def remove_library(entry_id: int):
     db.delete_library(entry_id)
     return {"ok": True}
+
+
+# ------------------------- خزنة وثائق الشركة -------------------------
+
+@app.get("/api/docs")
+def get_docs():
+    return db.list_company_docs()
+
+
+@app.post("/api/docs")
+def post_doc(doc: dict):
+    if not doc.get("name"):
+        raise HTTPException(400, "اسم الوثيقة مطلوب")
+    return db.upsert_company_doc(doc)
+
+
+@app.delete("/api/docs/{doc_id}")
+def remove_doc(doc_id: int):
+    db.delete_company_doc(doc_id)
+    return {"ok": True}
+
+
+# ----------------------------- التحليلات -----------------------------
+
+@app.get("/api/analytics")
+def get_analytics():
+    return compute_analytics()
 
 
 # ------------------------- توليد العروض وإدارتها -------------------------

@@ -17,6 +17,8 @@ function go(page) {
   if (page === "proposals") loadProposals();
   if (page === "prices") loadPrices();
   if (page === "library") loadLibrary();
+  if (page === "docs") loadDocs();
+  if (page === "analytics") loadAnalytics();
   if (page === "settings") loadSettings();
 }
 $$(".nav-btn").forEach((b) => b.addEventListener("click", () => go(b.dataset.page)));
@@ -63,6 +65,22 @@ async function loadDashboard() {
 
   $("#recentTable tbody").innerHTML = proposals.slice(0, 8).map(rowHtml).join("") ||
     `<tr><td colspan="7" class="muted">لا توجد عروض بعد — ابدأ بإنشاء عرض جديد</td></tr>`;
+
+  // تنبيهات صلاحية وثائق الشركة
+  const docs = await api("/api/docs");
+  const expired = docs.filter((d) => d.status === "expired");
+  const expiring = docs.filter((d) => d.status === "expiring");
+  if (expired.length || expiring.length) {
+    const parts = [];
+    if (expired.length) parts.push(`⛔ وثائق منتهية: ${expired.map((d) => d.name).join("، ")}`);
+    if (expiring.length) parts.push(`⚠️ تنتهي خلال 30 يوماً: ${expiring.map((d) => `${d.name} (${d.days_left} يوماً)`).join("، ")}`);
+    $("#docsAlert").innerHTML = `<div class="panel" style="border-right:4px solid var(--warn)">
+      <b>تنبيه الوثائق النظامية</b>
+      <p class="muted mt" style="line-height:1.9">${parts.join("<br>")}</p>
+      <button class="btn sm ghost mt" onclick="go('docs')">فتح وثائق الشركة</button></div>`;
+  } else {
+    $("#docsAlert").innerHTML = "";
+  }
 }
 
 function rowHtml(p) {
@@ -388,6 +406,97 @@ async function removeLibrary(id) {
   if (!confirm("حذف هذا النص من المكتبة؟")) return;
   await api(`/api/library/${id}`, { method: "DELETE" });
   loadLibrary();
+}
+
+/* ---------- وثائق الشركة ---------- */
+const DOC_STATUS = {
+  expired: ["منتهية ⛔", "lost"],
+  expiring: ["تنتهي قريباً ⚠️", "est"],
+  valid: ["سارية ✅", "src"],
+  missing: ["غير مُدخلة", "draft"],
+};
+
+async function loadDocs() {
+  const docs = await api("/api/docs");
+  $("#docsTable tbody").innerHTML = docs.map((d) => {
+    const [label, cls] = DOC_STATUS[d.status] || DOC_STATUS.missing;
+    const days = d.status === "expiring" ? ` (${d.days_left} يوماً)` : "";
+    return `<tr>
+      <td><b>${d.name}</b></td><td class="num-cell">${d.number || "—"}</td><td>${d.issuer || "—"}</td>
+      <td class="num-cell">${d.expiry_date || "—"}</td>
+      <td><span class="tag ${cls}">${label}${days}</span></td>
+      <td>
+        <button class="btn sm ghost" onclick='fillDocForm(${JSON.stringify(d).replace(/'/g, "&#39;")})'>تعديل</button>
+        <button class="btn sm danger" onclick="removeDoc(${d.id})">حذف</button>
+      </td></tr>`;
+  }).join("");
+}
+
+function fillDocForm(d) {
+  $("#docId").value = d.id; $("#docName").value = d.name;
+  $("#docNumber").value = d.number || ""; $("#docIssuer").value = d.issuer || "";
+  $("#docIssue").value = d.issue_date || ""; $("#docExpiry").value = d.expiry_date || "";
+  $("#docNotes").value = d.notes || "";
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+function clearDocForm() {
+  ["docId", "docName", "docNumber", "docIssuer", "docIssue", "docExpiry", "docNotes"]
+    .forEach((id) => $("#" + id).value = "");
+}
+
+async function saveDoc() {
+  const doc = {
+    id: $("#docId").value ? Number($("#docId").value) : undefined,
+    name: $("#docName").value.trim(),
+    number: $("#docNumber").value.trim(),
+    issuer: $("#docIssuer").value.trim(),
+    issue_date: $("#docIssue").value,
+    expiry_date: $("#docExpiry").value,
+    notes: $("#docNotes").value.trim(),
+  };
+  if (!doc.name) return toast("اسم الوثيقة مطلوب", true);
+  await api("/api/docs", { method: "POST", json: doc });
+  toast("تم حفظ الوثيقة ✅");
+  clearDocForm();
+  loadDocs();
+}
+
+async function removeDoc(id) {
+  if (!confirm("حذف هذه الوثيقة؟")) return;
+  await api(`/api/docs/${id}`, { method: "DELETE" });
+  loadDocs();
+}
+
+/* ---------- التحليلات ---------- */
+async function loadAnalytics() {
+  const a = await api("/api/analytics");
+  const t = a.totals;
+  $("#anCards").innerHTML = `
+    <div class="card gold"><div class="num">${t.win_rate !== null ? t.win_rate + "%" : "—"}</div><div class="lbl">نسبة الفوز (من العروض المحسومة)</div></div>
+    <div class="card"><div class="num">${fmt(t.won_value)}</div><div class="lbl">قيمة العروض الفائزة (ر.س)</div></div>
+    <div class="card"><div class="num">${fmt(t.pipeline_value)}</div><div class="lbl">قيمة العروض قيد الانتظار (ر.س)</div></div>
+    <div class="card"><div class="num">${t.by_status.won} / ${t.by_status.won + t.by_status.lost}</div><div class="lbl">فائز / محسوم</div></div>`;
+
+  const m = a.margins;
+  $("#anMargins").innerHTML = `
+    <h3>مؤشر معايرة التسعير</h3>
+    <div class="row" style="gap:26px">
+      <div>متوسط هامش الربح في العروض <b style="color:var(--ok)">الفائزة</b>: <b>${m.avg_won_margin !== null ? m.avg_won_margin + "%" : "—"}</b></div>
+      <div>متوسط هامش الربح في العروض <b style="color:#a33">الخاسرة</b>: <b>${m.avg_lost_margin !== null ? m.avg_lost_margin + "%" : "—"}</b></div>
+    </div>
+    <p class="muted mt" style="line-height:1.9">💡 ${m.hint}</p>`;
+
+  const ENTITY_AR = { government: "جهات حكومية", private: "قطاع خاص" };
+  $("#anEntityTable tbody").innerHTML = Object.entries(a.by_entity).map(([k, e]) => `
+    <tr><td><b>${ENTITY_AR[k]}</b></td><td>${e.total}</td><td>${e.won}</td>
+    <td>${e.win_rate !== null ? e.win_rate + "%" : "—"}</td>
+    <td class="num-cell">${fmt(e.won_value)}</td></tr>`).join("");
+
+  $("#anClientTable tbody").innerHTML = a.by_client.map((c) => `
+    <tr><td>${c.client}</td><td>${c.total}</td><td>${c.won}</td><td>${c.lost}</td>
+    <td>${c.win_rate !== null ? c.win_rate + "%" : "—"}</td>
+    <td class="num-cell">${fmt(c.won_value)}</td></tr>`).join("") ||
+    `<tr><td colspan="6" class="muted">لا توجد بيانات بعد</td></tr>`;
 }
 
 /* ---------- الإعدادات ---------- */
