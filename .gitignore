@@ -1,0 +1,9 @@
+# Runtime data
+data/*.db
+data/uploads/
+data/exports/
+__pycache__/
+*.pyc
+.env
+.venv/
+venv/
