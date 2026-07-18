@@ -51,6 +51,17 @@ CREATE TABLE IF NOT EXISTS content_library (
     tags TEXT DEFAULT '',
     updated_at TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS company_docs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    number TEXT DEFAULT '',
+    issuer TEXT DEFAULT '',
+    issue_date TEXT DEFAULT '',
+    expiry_date TEXT DEFAULT '',
+    notes TEXT DEFAULT '',
+    updated_at TEXT NOT NULL
+);
 """
 
 
@@ -258,3 +269,66 @@ def upsert_library(entry: dict) -> dict:
 def delete_library(entry_id: int):
     with get_db() as db:
         db.execute("DELETE FROM content_library WHERE id = ?", (entry_id,))
+
+
+# ------------------------- خزنة وثائق الشركة -------------------------
+
+def list_company_docs() -> list[dict]:
+    """الوثائق مع حالة الصلاحية: منتهية / تنتهي قريباً (≤30 يوماً) / سارية / غير مُدخلة."""
+    from datetime import date, timedelta
+    with get_db() as db:
+        rows = db.execute("SELECT * FROM company_docs ORDER BY expiry_date, name").fetchall()
+    today = date.today()
+    soon = today + timedelta(days=30)
+    docs = []
+    for r in rows:
+        d = dict(r)
+        exp = d.get("expiry_date") or ""
+        if not exp:
+            d["status"] = "missing"
+        else:
+            try:
+                exp_date = date.fromisoformat(exp)
+                if exp_date < today:
+                    d["status"] = "expired"
+                elif exp_date <= soon:
+                    d["status"] = "expiring"
+                else:
+                    d["status"] = "valid"
+                d["days_left"] = (exp_date - today).days
+            except ValueError:
+                d["status"] = "missing"
+        docs.append(d)
+    return docs
+
+
+def upsert_company_doc(doc: dict) -> dict:
+    ts = now_iso()
+    with get_db() as db:
+        if doc.get("id"):
+            db.execute(
+                "UPDATE company_docs SET name=?, number=?, issuer=?, issue_date=?, expiry_date=?, notes=?, updated_at=? WHERE id=?",
+                (doc["name"], doc.get("number", ""), doc.get("issuer", ""), doc.get("issue_date", ""),
+                 doc.get("expiry_date", ""), doc.get("notes", ""), ts, doc["id"]),
+            )
+            row = db.execute("SELECT * FROM company_docs WHERE id = ?", (doc["id"],)).fetchone()
+        else:
+            cur = db.execute(
+                "INSERT INTO company_docs (name, number, issuer, issue_date, expiry_date, notes, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (doc["name"], doc.get("number", ""), doc.get("issuer", ""), doc.get("issue_date", ""),
+                 doc.get("expiry_date", ""), doc.get("notes", ""), ts),
+            )
+            row = db.execute("SELECT * FROM company_docs WHERE id = ?", (cur.lastrowid,)).fetchone()
+    return dict(row)
+
+
+def delete_company_doc(doc_id: int):
+    with get_db() as db:
+        db.execute("DELETE FROM company_docs WHERE id = ?", (doc_id,))
+
+
+def list_proposals_full() -> list[dict]:
+    with get_db() as db:
+        rows = db.execute("SELECT * FROM proposals ORDER BY id DESC").fetchall()
+    return [_proposal_dict(r) for r in rows]

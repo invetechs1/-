@@ -19,6 +19,8 @@
     <button class="nav-btn" data-page="proposals">🗂️ أرشيف العروض</button>
     <button class="nav-btn" data-page="prices">💰 قاعدة الأسعار</button>
     <button class="nav-btn" data-page="library">📚 المكتبة الفنية</button>
+    <button class="nav-btn" data-page="docs">📄 وثائق الشركة</button>
+    <button class="nav-btn" data-page="analytics">📈 التحليلات</button>
     <button class="nav-btn" data-page="settings">⚙️ الإعدادات</button>
     <div class="engine-badge" id="engineBadge">…</div>
   </aside>
@@ -31,6 +33,7 @@
         <div><h2>لوحة التحكم</h2><p>نظرة عامة على نشاط العروض في عزوم</p></div>
         <button class="btn gold" onclick="go('new')">+ إنشاء عرض جديد</button>
       </div>
+      <div id="docsAlert"></div>
       <div class="cards" id="statCards"></div>
       <div class="panel">
         <h3>أحدث العروض</h3>
@@ -168,6 +171,58 @@
         </div>
       </div>
       <div id="libraryList"></div>
+    </section>
+
+    <!-- وثائق الشركة -->
+    <section class="page" id="page-docs">
+      <div class="page-head">
+        <div><h2>وثائق الشركة</h2><p>الوثائق النظامية المطلوبة للتأهل في المنافسات — النظام ينبهك قبل انتهاء صلاحية أي وثيقة بـ30 يوماً</p></div>
+      </div>
+      <div class="panel">
+        <h3>إضافة / تعديل وثيقة</h3>
+        <input type="hidden" id="docId">
+        <div class="grid-3">
+          <div><label>اسم الوثيقة *</label><input type="text" id="docName" placeholder="السجل التجاري"></div>
+          <div><label>رقم الوثيقة</label><input type="text" id="docNumber"></div>
+          <div><label>الجهة المصدرة</label><input type="text" id="docIssuer"></div>
+          <div><label>تاريخ الإصدار</label><input type="date" id="docIssue"></div>
+          <div><label>تاريخ الانتهاء</label><input type="date" id="docExpiry"></div>
+          <div><label>ملاحظات</label><input type="text" id="docNotes"></div>
+        </div>
+        <div class="mt row">
+          <button class="btn" onclick="saveDoc()">حفظ الوثيقة</button>
+          <button class="btn ghost" onclick="clearDocForm()">جديد</button>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="t-wrap"><table id="docsTable">
+          <thead><tr><th>الوثيقة</th><th>الرقم</th><th>الجهة المصدرة</th><th>تاريخ الانتهاء</th><th>الحالة</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table></div>
+      </div>
+    </section>
+
+    <!-- التحليلات -->
+    <section class="page" id="page-analytics">
+      <div class="page-head">
+        <div><h2>تحليلات الفوز والخسارة</h2><p>معايرة تسعيرك من واقع أرشيف العروض — حدّث حالات العروض (فائز/غير فائز) لتزداد دقة المؤشرات</p></div>
+      </div>
+      <div class="cards" id="anCards"></div>
+      <div class="panel" id="anMargins"></div>
+      <div class="panel">
+        <h3>الأداء حسب نوع الجهة</h3>
+        <div class="t-wrap"><table id="anEntityTable">
+          <thead><tr><th>نوع الجهة</th><th>العروض</th><th>الفائزة</th><th>نسبة الفوز</th><th>قيمة الفوز (ر.س)</th></tr></thead>
+          <tbody></tbody>
+        </table></div>
+      </div>
+      <div class="panel">
+        <h3>الأداء حسب العميل</h3>
+        <div class="t-wrap"><table id="anClientTable">
+          <thead><tr><th>العميل</th><th>العروض</th><th>فائز</th><th>غير فائز</th><th>نسبة الفوز</th><th>قيمة الفوز (ر.س)</th></tr></thead>
+          <tbody></tbody>
+        </table></div>
+      </div>
     </section>
 
     <!-- الإعدادات -->

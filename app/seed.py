@@ -3,7 +3,20 @@
 تُحمَّل مرة واحدة عند أول تشغيل، وتصبح بعدها قابلة للتعديل والتحديث
 من داخل النظام (شاشة قاعدة الأسعار وشاشة المكتبة الفنية).
 """
-from .database import get_db, list_price_items, upsert_price_item, upsert_library, list_library
+from .database import (get_db, list_price_items, upsert_price_item, upsert_library,
+                       list_library, list_company_docs, upsert_company_doc)
+
+# الوثائق النظامية المطلوبة للتأهل في المنافسات الحكومية — أدخل أرقامها وتواريخها من شاشة وثائق الشركة
+SEED_DOCS = [
+    ("السجل التجاري", "وزارة التجارة"),
+    ("شهادة الزكاة والدخل", "هيئة الزكاة والضريبة والجمارك"),
+    ("شهادة التأمينات الاجتماعية", "المؤسسة العامة للتأمينات الاجتماعية"),
+    ("شهادة السعودة (نطاقات)", "وزارة الموارد البشرية — قوى"),
+    ("شهادة تصنيف المقاولين", "وزارة الشؤون البلدية والقروية والإسكان"),
+    ("شهادة المحتوى المحلي", "هيئة المحتوى المحلي والمشتريات الحكومية"),
+    ("شهادة الغرفة التجارية", "الغرفة التجارية"),
+    ("الرخصة البلدية", "البلدية المختصة"),
+]
 
 # أسعار استرشادية بالريال السعودي — حدّثها من شاشة قاعدة الأسعار لتطابق أسعار عزوم الفعلية
 SEED_PRICES = [
@@ -119,3 +132,6 @@ def seed_if_empty():
     if not list_library():
         for category, title, body, tags in SEED_LIBRARY:
             upsert_library({"category": category, "title": title, "body": body, "tags": tags})
+    if not list_company_docs():
+        for name, issuer in SEED_DOCS:
+            upsert_company_doc({"name": name, "issuer": issuer})
