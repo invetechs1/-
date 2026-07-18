@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>نظام عزوم — العروض الفنية والمالية</title>
+<link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="logo">ع</div>
+      <h1>عــزوم</h1>
+      <p>نظام العروض الفنية والمالية</p>
+    </div>
+    <button class="nav-btn active" data-page="dashboard">📊 لوحة التحكم</button>
+    <button class="nav-btn" data-page="new">✨ عرض جديد</button>
+    <button class="nav-btn" data-page="proposals">🗂️ أرشيف العروض</button>
+    <button class="nav-btn" data-page="prices">💰 قاعدة الأسعار</button>
+    <button class="nav-btn" data-page="library">📚 المكتبة الفنية</button>
+    <button class="nav-btn" data-page="settings">⚙️ الإعدادات</button>
+    <div class="engine-badge" id="engineBadge">…</div>
+  </aside>
+
+  <main class="main">
+
+    <!-- لوحة التحكم -->
+    <section class="page active" id="page-dashboard">
+      <div class="page-head">
+        <div><h2>لوحة التحكم</h2><p>نظرة عامة على نشاط العروض في عزوم</p></div>
+        <button class="btn gold" onclick="go('new')">+ إنشاء عرض جديد</button>
+      </div>
+      <div class="cards" id="statCards"></div>
+      <div class="panel">
+        <h3>أحدث العروض</h3>
+        <div class="t-wrap"><table id="recentTable">
+          <thead><tr><th>رقم العرض</th><th>المشروع</th><th>العميل</th><th>الجهة</th><th>الحالة</th><th>التاريخ</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table></div>
+      </div>
+    </section>
+
+    <!-- عرض جديد -->
+    <section class="page" id="page-new">
+      <div class="page-head">
+        <div><h2>إنشاء عرض جديد</h2><p>ارفع ملفات المشروع (كراسة الشروط، RFP، جداول كميات...) وسيتولى النظام إعداد العرض الفني والمالي والخطة التنفيذية</p></div>
+      </div>
+      <div class="panel">
+        <div class="grid-2">
+          <div><label>اسم المشروع *</label><input type="text" id="npTitle" placeholder="مثال: إنشاء وتجهيز مبنى إداري"></div>
+          <div><label>العميل / الجهة *</label><input type="text" id="npClient" placeholder="مثال: أمانة منطقة الرياض"></div>
+        </div>
+        <label>نوع الجهة</label>
+        <select id="npEntity">
+          <option value="government">جهة حكومية (منافسة عبر منصة اعتماد)</option>
+          <option value="private">قطاع خاص</option>
+        </select>
+        <label>ملفات المشروع (PDF / Word / Excel / نص)</label>
+        <div class="dropzone" id="dropzone">
+          <div class="big">📁</div>
+          اسحب الملفات هنا أو اضغط للاختيار
+          <input type="file" id="fileInput" multiple hidden accept=".pdf,.docx,.xlsx,.xlsm,.txt,.md,.csv">
+        </div>
+        <div class="file-list" id="fileList"></div>
+        <div class="mt row">
+          <button class="btn gold" id="generateBtn">⚡ توليد العرض الفني والمالي</button>
+          <span class="muted" id="engineHint"></span>
+        </div>
+        <div class="spinner" id="genSpinner">
+          <div class="dot"></div>
+          جارٍ تحليل وثائق المشروع وإعداد العرض الفني والمالي والخطة التنفيذية...<br>
+          <span class="muted">قد يستغرق التوليد بالذكاء الاصطناعي بضع دقائق للمشاريع الكبيرة</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- أرشيف العروض -->
+    <section class="page" id="page-proposals">
+      <div class="page-head">
+        <div><h2>أرشيف العروض</h2><p>جميع العروض السابقة — مرجع دائم للتسعير والمحتوى الفني</p></div>
+      </div>
+      <div class="panel">
+        <div class="t-wrap"><table id="proposalsTable">
+          <thead><tr><th>رقم العرض</th><th>المشروع</th><th>العميل</th><th>الجهة</th><th>الحالة</th><th>التاريخ</th><th>إجراءات</th></tr></thead>
+          <tbody></tbody>
+        </table></div>
+      </div>
+    </section>
+
+    <!-- عارض العرض -->
+    <section class="page" id="page-viewer">
+      <div class="page-head">
+        <div><h2 id="vTitle">—</h2><p id="vMeta"></p></div>
+        <div class="row">
+          <select id="vStatus" onchange="changeStatus()">
+            <option value="draft">مسودة</option>
+            <option value="submitted">مُقدَّم</option>
+            <option value="won">فائز 🏆</option>
+            <option value="lost">غير فائز</option>
+          </select>
+          <button class="btn" onclick="exportDocx()">⬇️ تصدير Word</button>
+          <button class="btn ghost" onclick="exportXlsx()">⬇️ جدول الكميات Excel</button>
+        </div>
+      </div>
+      <div class="tabs">
+        <button class="tab-btn active" data-tab="tech">العرض الفني</button>
+        <button class="tab-btn" data-tab="fin">العرض المالي</button>
+        <button class="tab-btn" data-tab="plan">الخطة التنفيذية</button>
+      </div>
+      <div class="tab-pane active" id="tab-tech"></div>
+      <div class="tab-pane" id="tab-fin"></div>
+      <div class="tab-pane" id="tab-plan"></div>
+    </section>
+
+    <!-- قاعدة الأسعار -->
+    <section class="page" id="page-prices">
+      <div class="page-head">
+        <div><h2>قاعدة الأسعار</h2><p>أسعار عزوم المعتمدة — تُستخدم تلقائياً عند بناء جداول الكميات وتُحدَّث باستمرار</p></div>
+        <div class="row">
+          <a class="btn ghost sm" href="/api/prices/export/csv">⬇️ تصدير CSV</a>
+          <label class="btn ghost sm" style="cursor:pointer">⬆️ استيراد CSV<input type="file" id="csvImport" hidden accept=".csv"></label>
+        </div>
+      </div>
+      <div class="panel">
+        <h3>إضافة / تحديث بند</h3>
+        <div class="grid-3">
+          <div><label>الكود *</label><input type="text" id="prCode" placeholder="CV-010"></div>
+          <div><label>التصنيف *</label><input type="text" id="prCat" list="catList" placeholder="الأعمال المدنية"></div>
+          <div><label>الوحدة *</label><input type="text" id="prUnit" placeholder="م2"></div>
+        </div>
+        <div class="grid-2">
+          <div><label>اسم البند *</label><input type="text" id="prName"></div>
+          <div><label>سعر الوحدة (ر.س) *</label><input type="number" id="prPrice" step="0.01"></div>
+        </div>
+        <div class="mt"><button class="btn" onclick="savePrice()">حفظ البند</button>
+        <span class="muted">حفظ بند بكود موجود يحدّث سعره ويسجل تاريخ التغيير</span></div>
+      </div>
+      <div class="panel">
+        <div class="row mb">
+          <input type="text" id="prSearch" placeholder="🔍 بحث بالاسم أو الكود..." style="max-width:280px" oninput="loadPrices()">
+          <select id="prFilterCat" onchange="loadPrices()" style="max-width:240px"><option value="">كل التصنيفات</option></select>
+        </div>
+        <div class="t-wrap"><table id="pricesTable">
+          <thead><tr><th>الكود</th><th>التصنيف</th><th>البند</th><th>الوحدة</th><th>السعر (ر.س)</th><th>آخر تحديث</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table></div>
+      </div>
+      <datalist id="catList"></datalist>
+    </section>
+
+    <!-- المكتبة الفنية -->
+    <section class="page" id="page-library">
+      <div class="page-head">
+        <div><h2>المكتبة الفنية</h2><p>نصوص عزوم المعتمدة (منهجيات، خطط جودة وسلامة، تعريف الشركة...) — تُعاد صياغتها تلقائياً في كل عرض</p></div>
+      </div>
+      <div class="panel">
+        <h3>إضافة / تعديل نص</h3>
+        <input type="hidden" id="libId">
+        <div class="grid-2">
+          <div><label>التصنيف</label><input type="text" id="libCat" placeholder="المنهجية"></div>
+          <div><label>العنوان *</label><input type="text" id="libTitle"></div>
+        </div>
+        <label>النص *</label><textarea id="libBody"></textarea>
+        <div class="mt row">
+          <button class="btn" onclick="saveLibrary()">حفظ</button>
+          <button class="btn ghost" onclick="clearLibraryForm()">جديد</button>
+        </div>
+      </div>
+      <div id="libraryList"></div>
+    </section>
+
+    <!-- الإعدادات -->
+    <section class="page" id="page-settings">
+      <div class="page-head">
+        <div><h2>الإعدادات</h2><p>بيانات الشركة والنسب المالية المعتمدة في التسعير</p></div>
+      </div>
+      <div class="panel">
+        <h3>بيانات الشركة</h3>
+        <div class="grid-2">
+          <div><label>اسم الشركة</label><input type="text" id="stName" data-key="company_name"></div>
+          <div><label>السجل التجاري</label><input type="text" id="stCr" data-key="company_cr"></div>
+          <div><label>الرقم الضريبي</label><input type="text" id="stVatNo" data-key="company_vat_no"></div>
+          <div><label>العنوان</label><input type="text" id="stAddr" data-key="company_address"></div>
+          <div><label>الهاتف</label><input type="text" id="stPhone" data-key="company_phone"></div>
+          <div><label>البريد الإلكتروني</label><input type="text" id="stEmail" data-key="company_email"></div>
+        </div>
+      </div>
+      <div class="panel">
+        <h3>نموذج التسعير</h3>
+        <div class="grid-3">
+          <div><label>المصاريف الإدارية والعمومية %</label><input type="number" data-key="overhead_pct" step="0.5"></div>
+          <div><label>احتياطي المخاطر %</label><input type="number" data-key="risk_pct" step="0.5"></div>
+          <div><label>هامش الربح %</label><input type="number" data-key="profit_pct" step="0.5"></div>
+          <div><label>ضريبة القيمة المضافة %</label><input type="number" data-key="vat_rate" step="0.5"></div>
+          <div><label>سريان العرض (يوم)</label><input type="number" data-key="validity_days"></div>
+          <div><label>الضمان الابتدائي %</label><input type="number" data-key="bid_bond_pct" step="0.5"></div>
+        </div>
+        <label>شروط الدفع القياسية</label>
+        <textarea data-key="payment_terms"></textarea>
+        <div class="mt"><button class="btn" onclick="saveSettings()">حفظ الإعدادات</button></div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+<script src="/static/app.js"></script>
+</body>
+</html>
