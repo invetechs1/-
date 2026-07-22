@@ -122,6 +122,30 @@ SEED_LIBRARY = [
 ]
 
 
+def load_prices_csv() -> int:
+    """تحميل أسعار عزوم الفعلية من ملف البذور CSV (المستخرج من عروض سابقة). يُعيد عدد البنود."""
+    import csv
+    from pathlib import Path
+    csv_path = Path(__file__).parent / "seed_data" / "azoom_prices.csv"
+    if not csv_path.exists():
+        return 0
+    count = 0
+    with open(csv_path, encoding="utf-8-sig") as f:
+        for row in csv.DictReader(f):
+            if not row.get("code") or not row.get("name"):
+                continue
+            upsert_price_item({
+                "code": row["code"].strip(),
+                "category": (row.get("category") or "غير مصنف").strip(),
+                "name": row["name"].strip(),
+                "unit": (row.get("unit") or "وحدة").strip(),
+                "unit_price": float(row.get("unit_price") or 0),
+                "notes": (row.get("notes") or "").strip(),
+            })
+            count += 1
+    return count
+
+
 def seed_if_empty():
     if not list_price_items():
         for code, category, name, unit, price in SEED_PRICES:
@@ -129,6 +153,7 @@ def seed_if_empty():
                 "code": code, "category": category, "name": name,
                 "unit": unit, "unit_price": price,
             })
+        load_prices_csv()
     if not list_library():
         for category, title, body, tags in SEED_LIBRARY:
             upsert_library({"category": category, "title": title, "body": body, "tags": tags})
