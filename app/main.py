@@ -16,6 +16,7 @@ from .export_xlsx import export_boq_xlsx
 from .file_extract import extract_text
 from .proposal_builder import build_template_proposal, compute_financials, match_price_catalog
 from .seed import seed_if_empty
+from .similarity import find_similar, get_reference_content
 
 app = FastAPI(title="نظام عزوم للعروض الفنية والمالية", version="1.0.0")
 
@@ -183,18 +184,35 @@ async def generate_proposal(
         texts.append(f"===== الملف: {f.filename} =====\n{extracted}")
     files_text = "\n\n".join(texts)
 
+    # البحث عن العروض السابقة الأشبه بنطاق المشروع — أساس بناء العرض الجديد
+    matches = find_similar(f"{title}\n{files_text[:8000]}", top_n=3)
+    similar_refs = get_reference_content([m["id"] for m in matches]) if matches else []
+    # ترتيب المحتوى بنفس ترتيب درجات التطابق
+    order = {m["id"]: i for i, m in enumerate(matches)}
+    similar_refs.sort(key=lambda p: order.get(p["id"], 99))
+
     if ai_available():
         try:
-            data = generate_proposal_ai(title, client, entity_type, files_text)
+            data = generate_proposal_ai(title, client, entity_type, files_text, similar_refs)
         except Exception as exc:
             # فشل الاتصال أو التوليد — ننتقل لمحرك القوالب مع إبلاغ المستخدم
-            data = build_template_proposal(title, client, entity_type, files_text)
+            data = build_template_proposal(title, client, entity_type, files_text, similar_refs)
             data["engine_note"] = f"تعذر التوليد بالذكاء الاصطناعي ({exc}) — استُخدم محرك القوالب."
     else:
-        data = build_template_proposal(title, client, entity_type, files_text)
+        data = build_template_proposal(title, client, entity_type, files_text, similar_refs)
 
+    data["similar_refs"] = [
+        {"id": m["id"], "ref_no": m["ref_no"], "title": m["title"], "score": m["score"]}
+        for m in matches
+    ]
     proposal = db.create_proposal(title, client, entity_type, data)
     return proposal
+
+
+@app.get("/api/proposals/similar")
+def similar_proposals(q: str):
+    """البحث عن العروض السابقة المشابهة لنص مشروع (يُستخدم مباشرة في شاشة عرض جديد)."""
+    return find_similar(q, top_n=5)
 
 
 @app.get("/api/proposals")

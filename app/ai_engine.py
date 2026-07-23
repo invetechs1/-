@@ -110,7 +110,27 @@ def ai_available() -> bool:
     return bool(ANTHROPIC_API_KEY)
 
 
-def generate_proposal_ai(title: str, client_name: str, entity_type: str, files_text: str) -> dict:
+def _format_similar_refs(similar_refs: list[dict] | None) -> str:
+    if not similar_refs:
+        return "(لا توجد عروض سابقة مشابهة في الأرشيف)"
+    parts = []
+    for ref in similar_refs[:2]:
+        d = ref.get("data", {})
+        boq_sample = "\n".join(
+            f"  - {l['name']} | {l.get('unit','')} | سعر الوحدة: {l.get('unit_price',0)} ريال"
+            for l in d.get("boq", []) if l.get("unit_price")
+        )[:6000]
+        parts.append(
+            f"### عرض سابق مشابه: {ref['title']} — {ref['client']}\n"
+            f"الملخص: {d.get('summary','')}\n"
+            f"نطاقه: {'، '.join(d.get('scope', [])[:15])}\n"
+            f"بنوده المسعّرة (استرشد بها في التسعير والصياغة):\n{boq_sample}"
+        )
+    return "\n\n".join(parts)
+
+
+def generate_proposal_ai(title: str, client_name: str, entity_type: str, files_text: str,
+                         similar_refs: list[dict] | None = None) -> dict:
     import anthropic
 
     client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
@@ -137,10 +157,14 @@ def generate_proposal_ai(title: str, client_name: str, entity_type: str, files_t
 ## المكتبة الفنية (نصوص عزوم المعتمدة)
 {library_txt}
 
-## وثائق المشروع المرفوعة
-{files_text or '(لم تُرفق وثائق — ابنِ العرض على اسم المشروع ونوع الجهة)'}
+## عروض عزوم السابقة المشابهة لنطاق هذا المشروع (خبرة الشركة الفعلية — ابنِ عليها)
+{_format_similar_refs(similar_refs)}
 
-أنتج العرض الكامل الآن وفق المخطط المطلوب."""
+## وثائق المشروع المرفوعة
+{files_text or '(لم تُرفق وثائق — ابنِ العرض على اسم المشروع ونوع الجهة والعروض المشابهة)'}
+
+أنتج العرض الكامل الآن وفق المخطط المطلوب، مستفيداً من بنود وأسعار العروض السابقة
+المشابهة كلما طابقت نطاق المشروع الجديد."""
 
     with client.messages.stream(
         model=CLAUDE_MODEL,
