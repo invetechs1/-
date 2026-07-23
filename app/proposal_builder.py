@@ -107,27 +107,48 @@ _KEYWORD_MAP = [
 _DEFAULT_CODES = ["GN-001", "HR-001", "HR-002", "HR-007", "GN-003", "GN-004", "GN-005"]
 
 
-def build_template_proposal(title: str, client: str, entity_type: str, files_text: str) -> dict:
-    """توليد عرض متكامل بمحرك القوالب (بديل عند غياب مفتاح Claude API)."""
-    text = f"{title}\n{files_text}"
-    codes: list[str] = []
-    for keywords, item_codes in _KEYWORD_MAP:
-        if any(k in text for k in keywords):
-            for c in item_codes:
-                if c not in codes:
-                    codes.append(c)
-    if not codes:
-        codes = _DEFAULT_CODES
+def build_template_proposal(title: str, client: str, entity_type: str, files_text: str,
+                            similar_refs: list[dict] | None = None) -> dict:
+    """توليد عرض متكامل بمحرك القوالب (بديل عند غياب مفتاح Claude API).
 
-    catalog = {i["code"]: i for i in list_price_items()}
-    boq = []
-    for code in codes:
-        item = catalog.get(code)
-        if item:
-            boq.append({
-                "code": item["code"], "name": item["name"], "unit": item["unit"],
-                "qty": 1, "unit_price": item["unit_price"], "source": "قاعدة الأسعار",
-            })
+    عند وجود عروض سابقة مشابهة (similar_refs) يُبنى جدول الكميات من بنود
+    أقرب عرض مطابق بدلاً من المطابقة بالكلمات المفتاحية فقط.
+    """
+    text = f"{title}\n{files_text}"
+    boq: list[dict] = []
+    matched_ref_note = ""
+
+    # أولاً: البناء من أقرب عرض سابق مشابه إن وُجد تطابق قوي
+    if similar_refs:
+        best = similar_refs[0]
+        ref_boq = best.get("data", {}).get("boq", [])
+        if ref_boq:
+            matched_ref_note = f"{best['title']} ({best['ref_no']})"
+            for l in ref_boq:
+                boq.append({
+                    "code": l.get("code", ""), "name": l["name"], "unit": l.get("unit", "وحدة"),
+                    "qty": l.get("qty", 1), "unit_price": l.get("unit_price", 0),
+                    "source": l.get("source") or ("قاعدة الأسعار" if l.get("code") else "من عرض سابق"),
+                })
+
+    # ثانياً: المطابقة بالكلمات المفتاحية عند غياب مرجع مشابه
+    if not boq:
+        codes: list[str] = []
+        for keywords, item_codes in _KEYWORD_MAP:
+            if any(k in text for k in keywords):
+                for c in item_codes:
+                    if c not in codes:
+                        codes.append(c)
+        if not codes:
+            codes = _DEFAULT_CODES
+        catalog = {i["code"]: i for i in list_price_items()}
+        for code in codes:
+            item = catalog.get(code)
+            if item:
+                boq.append({
+                    "code": item["code"], "name": item["name"], "unit": item["unit"],
+                    "qty": 1, "unit_price": item["unit_price"], "source": "قاعدة الأسعار",
+                })
 
     library = {e["title"]: e["body"] for e in list_library()}
     # الهيكل المعتمد للعرض الفني في المنافسات الحكومية السعودية (منصة اعتماد)
@@ -143,7 +164,12 @@ def build_template_proposal(title: str, client: str, entity_type: str, files_tex
         {"title": "الهيكل التنظيمي وفريق العمل", "body":
             "يُشكَّل فريق مشروع متكامل بقيادة مدير مشروع معتمد PMP يمثل نقطة الاتصال الوحيدة مع "
             "صاحب العمل، وتُرفق السير الذاتية للكوادر الأساسية ضمن الملاحق. (راجع جدول فريق العمل.)"},
-        {"title": "الخبرات والمشاريع المماثلة", "body": library.get("الخبرات والمشاريع المماثلة", "")},
+        {"title": "الخبرات والمشاريع المماثلة",
+         "body": (f"نفذت شركة عزوم وقدمت عروضاً لمشاريع مماثلة مباشرة لنطاق هذا المشروع، "
+                  f"أقربها: {matched_ref_note}، وقد بُني جدول الكميات في هذا العرض على خبرة "
+                  f"التسعير الفعلية لذلك المشروع. "
+                  + library.get("الخبرات والمشاريع المماثلة", ""))
+         if matched_ref_note else library.get("الخبرات والمشاريع المماثلة", "")},
         {"title": "خطة ضمان الجودة", "body": library.get("خطة ضمان الجودة", "")},
         {"title": "خطة السلامة والصحة المهنية", "body": library.get("خطة السلامة والصحة المهنية", "")},
         {"title": "إدارة المخاطر", "body": library.get("منهجية إدارة المخاطر", "")},

@@ -51,9 +51,10 @@
       </div>
       <div class="panel">
         <div class="grid-2">
-          <div><label>اسم المشروع *</label><input type="text" id="npTitle" placeholder="مثال: إنشاء وتجهيز مبنى إداري"></div>
+          <div><label>اسم المشروع *</label><input type="text" id="npTitle" placeholder="مثال: إنشاء وتجهيز مبنى إداري" oninput="suggestSimilar()"></div>
           <div><label>العميل / الجهة *</label><input type="text" id="npClient" placeholder="مثال: أمانة منطقة الرياض"></div>
         </div>
+        <div id="similarBox"></div>
         <label>نوع الجهة</label>
         <select id="npEntity">
           <option value="government">جهة حكومية (منافسة عبر منصة اعتماد)</option>

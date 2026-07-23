@@ -117,6 +117,29 @@ function renderFileList() {
   ).join("");
 }
 
+/* اقتراح العروض المشابهة أثناء كتابة اسم المشروع */
+let similarTimer;
+function suggestSimilar() {
+  clearTimeout(similarTimer);
+  similarTimer = setTimeout(async () => {
+    const q = $("#npTitle").value.trim();
+    if (q.length < 5) { $("#similarBox").innerHTML = ""; return; }
+    try {
+      const matches = await api(`/api/proposals/similar?q=${encodeURIComponent(q)}`);
+      if (!matches.length) { $("#similarBox").innerHTML = ""; return; }
+      $("#similarBox").innerHTML = `
+        <div class="mt" style="border:1px solid var(--accent);border-radius:10px;padding:12px 14px;background:#fdf9f0">
+          <b style="color:var(--primary)">🧠 عروض سابقة مشابهة في الأرشيف — سيُبنى العرض الجديد عليها:</b>
+          ${matches.map((m) => `
+            <div class="row mt" style="justify-content:space-between;font-size:13px">
+              <span>${m.title} <span class="muted">(${m.client})</span></span>
+              <span class="tag gov">تطابق ${m.score}% • ${m.boq_lines} بنداً</span>
+            </div>`).join("")}
+        </div>`;
+    } catch { /* تجاهل أخطاء الاقتراح */ }
+  }, 400);
+}
+
 $("#generateBtn").addEventListener("click", async () => {
   const title = $("#npTitle").value.trim();
   const client = $("#npClient").value.trim();
@@ -175,8 +198,13 @@ function viewProposal(p) {
   go("viewer");
   $$(".nav-btn").forEach((b) => b.classList.remove("active"));
   $("#vTitle").textContent = `${p.ref_no} — ${p.title}`;
-  const engine = p.data.engine === "claude" ? "🤖 توليد Claude AI" : "📋 محرك القوالب";
-  $("#vMeta").textContent = `${p.client} • ${p.entity_type === "government" ? "جهة حكومية" : "قطاع خاص"} • ${engine}`;
+  const engine = p.data.engine === "claude" ? "🤖 توليد Claude AI"
+    : p.data.reference ? "🗄️ عرض مرجعي (محلل من عرض فعلي)" : "📋 محرك القوالب";
+  let meta = `${p.client} • ${p.entity_type === "government" ? "جهة حكومية" : "قطاع خاص"} • ${engine}`;
+  if (p.data.similar_refs?.length) {
+    meta += ` • مبني على: ${p.data.similar_refs.map((r) => `${r.title.slice(0, 30)}… (${r.score}%)`).join("، ")}`;
+  }
+  $("#vMeta").textContent = meta;
   $("#vStatus").value = p.status;
   renderTech(p.data);
   renderFin(p.data);

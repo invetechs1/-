@@ -146,6 +146,37 @@ def load_prices_csv() -> int:
     return count
 
 
+def load_reference_proposals() -> int:
+    """تحميل العروض المرجعية (عروض عزوم السابقة المحللة) إلى الأرشيف. يُعيد عدد المضاف."""
+    import json
+    from pathlib import Path
+    from .database import list_proposals_full, create_proposal, update_proposal
+    path = Path(__file__).parent / "seed_data" / "reference_proposals.json"
+    if not path.exists():
+        return 0
+    existing_titles = {p["title"] for p in list_proposals_full() if p["data"].get("reference")}
+    count = 0
+    for ref in json.loads(path.read_text(encoding="utf-8")):
+        if ref["title"] in existing_titles:
+            continue
+        data = {
+            "reference": True,
+            "summary": ref.get("summary", ""),
+            "scope": ref.get("scope", []),
+            "keywords": ref.get("keywords", ""),
+            "technical_sections": [],
+            "boq": ref.get("boq", []),
+            "financial": ref.get("financial_actual") or {},
+            "plan": [],
+            "engine": "أرشيف — عرض فعلي محلل",
+        }
+        p = create_proposal(ref["title"], ref["client"], ref.get("entity_type", "government"), data)
+        if ref.get("status") and ref["status"] != "draft":
+            update_proposal(p["id"], {"status": ref["status"]})
+        count += 1
+    return count
+
+
 def seed_if_empty():
     if not list_price_items():
         for code, category, name, unit, price in SEED_PRICES:
@@ -160,3 +191,4 @@ def seed_if_empty():
     if not list_company_docs():
         for name, issuer in SEED_DOCS:
             upsert_company_doc({"name": name, "issuer": issuer})
+    load_reference_proposals()
