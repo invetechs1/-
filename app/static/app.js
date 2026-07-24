@@ -17,6 +17,7 @@ function go(page) {
   if (page === "proposals") loadProposals();
   if (page === "prices") loadPrices();
   if (page === "library") loadLibrary();
+  if (page === "repo") loadRepo();
   if (page === "docs") loadDocs();
   if (page === "analytics") loadAnalytics();
   if (page === "settings") loadSettings();
@@ -434,6 +435,133 @@ async function removeLibrary(id) {
   if (!confirm("حذف هذا النص من المكتبة؟")) return;
   await api(`/api/library/${id}`, { method: "DELETE" });
   loadLibrary();
+}
+
+/* ---------- المستودع المعرفي ---------- */
+let repoFiles = [];
+const repoDrop = $("#repoDrop"), repoInput = $("#repoFileInput");
+repoDrop.addEventListener("click", () => repoInput.click());
+repoDrop.addEventListener("dragover", (e) => { e.preventDefault(); repoDrop.classList.add("drag"); });
+repoDrop.addEventListener("dragleave", () => repoDrop.classList.remove("drag"));
+repoDrop.addEventListener("drop", (e) => {
+  e.preventDefault(); repoDrop.classList.remove("drag");
+  for (const f of e.dataTransfer.files) repoFiles.push(f);
+  renderRepoFiles();
+});
+repoInput.addEventListener("change", () => {
+  for (const f of repoInput.files) repoFiles.push(f);
+  renderRepoFiles();
+});
+function renderRepoFiles() {
+  $("#repoFileList").innerHTML = repoFiles.map((f, i) =>
+    `<span class="file-chip">${f.name}<button onclick="repoFiles.splice(${i},1);renderRepoFiles()">✕</button></span>`).join("");
+}
+
+async function uploadRepo() {
+  if (!repoFiles.length) return toast("اختر ملفات أولاً", true);
+  const form = new FormData();
+  form.append("source_type", $("#repoSource").value);
+  form.append("company", $("#repoCompany").value.trim());
+  form.append("notes", $("#repoNotes").value.trim());
+  for (const f of repoFiles) form.append("files", f);
+  $("#repoUploadBtn").disabled = true;
+  $("#repoSpinner").classList.add("on");
+  try {
+    const results = await api("/api/repo/upload", { method: "POST", body: form });
+    const total = results.reduce((s, r) => s + r.items_count, 0);
+    toast(`✅ خُزّن ${results.length} ملفاً واستُخرج ${total} بنداً مسعّراً`);
+    repoFiles = []; renderRepoFiles();
+    loadRepo();
+  } catch (err) {
+    toast("فشل الرفع: " + err.message, true);
+  } finally {
+    $("#repoUploadBtn").disabled = false;
+    $("#repoSpinner").classList.remove("on");
+  }
+}
+
+async function loadRepo() {
+  const data = await api("/api/repo");
+  $("#repoTable tbody").innerHTML = data.files.map((f) => `
+    <tr>
+      <td>${f.filename}</td>
+      <td><span class="tag ${f.source_type.includes("منافس") ? "est" : "gov"}">${f.source_type}</span></td>
+      <td>${f.company || "—"}</td>
+      <td class="num-cell">${f.items_count}</td>
+      <td class="num-cell muted">${f.uploaded_at.slice(0, 10)}</td>
+      <td><button class="btn sm danger" onclick="removeRepoFile(${f.id})">حذف</button></td>
+    </tr>`).join("") ||
+    `<tr><td colspan="6" class="muted">المستودع فارغ — ارفع أول ملفاتك</td></tr>`;
+}
+
+async function removeRepoFile(id) {
+  if (!confirm("حذف هذا الملف وبنوده من المستودع؟")) return;
+  await api(`/api/repo/${id}`, { method: "DELETE" });
+  loadRepo();
+}
+
+let marketTimer;
+$("#marketSearch").addEventListener("input", () => {
+  clearTimeout(marketTimer);
+  marketTimer = setTimeout(async () => {
+    const q = $("#marketSearch").value.trim();
+    if (q.length < 3) { $("#marketResult").innerHTML = ""; return; }
+    const r = await api(`/api/market/search?q=${encodeURIComponent(q)}`);
+    const b = r.benchmark;
+    let html = "";
+    if (b.count) {
+      html += `<div class="row mb" style="gap:20px">
+        <span>📊 السوق (${b.count} ملاحظة):</span>
+        <span>الأدنى <b>${fmt(b.min)}</b></span>
+        <span>المتوسط <b style="color:var(--accent)">${fmt(b.avg)}</b></span>
+        <span>الأعلى <b>${fmt(b.max)}</b></span></div>`;
+    }
+    if (r.azoom.length) {
+      html += `<p class="muted mb">أسعار عزوم المعتمدة المطابقة: ${r.azoom.slice(0, 3).map((a) => `${a.name.slice(0, 30)} = <b>${fmt(a.unit_price)}</b>`).join(" • ")}</p>`;
+    }
+    html += r.market.length ? `<div class="t-wrap"><table>
+      <thead><tr><th>البند</th><th>الوحدة</th><th>السعر</th><th>المصدر</th></tr></thead>
+      <tbody>${r.market.slice(0, 12).map((m) => `<tr><td>${m.name.slice(0, 60)}</td><td>${m.unit || "—"}</td>
+        <td class="num-cell"><b>${fmt(m.unit_price)}</b></td>
+        <td class="muted">${m.source_company || m.source_type || m.filename || ""}</td></tr>`).join("")}</tbody>
+      </table></div>` : `<p class="muted">لا توجد ملاحظات سوق لهذا البند بعد</p>`;
+    $("#marketResult").innerHTML = html;
+  }, 400);
+});
+
+/* ---------- تحليل فرصة الفوز ---------- */
+async function runOpportunity() {
+  const title = $("#npTitle").value.trim();
+  if (!title) return toast("أدخل اسم المشروع أولاً", true);
+  const form = new FormData();
+  form.append("title", title);
+  form.append("client", $("#npClient").value.trim());
+  for (const f of pendingFiles) form.append("files", f);
+  $("#oppBtn").disabled = true;
+  $("#oppResult").innerHTML = `<div class="spinner on"><div class="dot"></div>جارٍ تحليل فرصة الفوز...</div>`;
+  try {
+    const a = await api("/api/opportunity", { method: "POST", body: form });
+    const colors = { go: "var(--ok)", caution: "var(--warn)", nogo: "#a33" };
+    $("#oppResult").innerHTML = `
+      <div class="panel mt" style="border-right:5px solid ${colors[a.verdict_class]}">
+        <div class="row" style="justify-content:space-between">
+          <h3 style="margin:0">🎯 فرصة الفوز: ${a.score}%</h3>
+          <b style="color:${colors[a.verdict_class]}">${a.verdict}</b>
+        </div>
+        <div class="mt">${a.factors.map((f) => `
+          <div class="fin-row"><span>${f.name} <span class="muted">(وزن ${f.weight}%)</span><br>
+            <span class="muted" style="font-size:12px">${f.detail}</span></span>
+            <b class="num-cell" style="color:${f.score >= 65 ? "var(--ok)" : f.score >= 40 ? "var(--warn)" : "#a33"}">${f.score}%</b></div>`).join("")}
+        </div>
+        ${a.qualification_warnings.length ? `<div class="mt"><b>⚠️ اشتراطات تستدعي الانتباه:</b>
+          ${a.qualification_warnings.map((w) => `<p class="muted" style="margin-top:6px">• ${w}</p>`).join("")}</div>` : ""}
+      </div>`;
+  } catch (err) {
+    $("#oppResult").innerHTML = "";
+    toast("فشل التحليل: " + err.message, true);
+  } finally {
+    $("#oppBtn").disabled = false;
+  }
 }
 
 /* ---------- وثائق الشركة ---------- */
