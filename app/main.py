@@ -15,6 +15,7 @@ from .export_docx import export_proposal_docx
 from .export_xlsx import export_boq_xlsx
 from .file_extract import extract_text
 from .proposal_builder import build_template_proposal, compute_financials, match_price_catalog
+from .etimad import fetch_tenders, has_session, list_tenders, update_tender_status
 from .opportunity import analyze_opportunity
 from .repository import find_relevant_repo_texts, ingest_file
 from .seed import seed_if_empty
@@ -210,6 +211,24 @@ def market_search(q: str):
         "max": max(prices) if prices else None,
     }
     return {"market": market, "azoom": azoom, "benchmark": bench}
+
+
+# ------------------------ منافسات اعتماد ------------------------
+
+@app.post("/api/etimad/fetch")
+def etimad_fetch(pages: int = 3):
+    return fetch_tenders(pages=max(1, min(pages, 10)))
+
+
+@app.get("/api/etimad")
+def etimad_list(status: str = "", q: str = "", min_relevance: int = 0):
+    return {"tenders": list_tenders(status, q, min_relevance), "session": has_session()}
+
+
+@app.put("/api/etimad/{tid}")
+def etimad_status(tid: int, body: dict):
+    update_tender_status(tid, body.get("status", "جديدة"))
+    return {"ok": True}
 
 
 # ------------------------ تحليل فرصة الفوز ------------------------
