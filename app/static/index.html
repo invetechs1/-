@@ -19,6 +19,7 @@
     <button class="nav-btn" data-page="proposals">🗂️ أرشيف العروض</button>
     <button class="nav-btn" data-page="prices">💰 قاعدة الأسعار</button>
     <button class="nav-btn" data-page="library">📚 المكتبة الفنية</button>
+    <button class="nav-btn" data-page="repo">🗄️ المستودع المعرفي</button>
     <button class="nav-btn" data-page="docs">📄 وثائق الشركة</button>
     <button class="nav-btn" data-page="analytics">📈 التحليلات</button>
     <button class="nav-btn" data-page="settings">⚙️ الإعدادات</button>
@@ -69,8 +70,10 @@
         <div class="file-list" id="fileList"></div>
         <div class="mt row">
           <button class="btn gold" id="generateBtn">⚡ توليد العرض الفني والمالي</button>
+          <button class="btn ghost" id="oppBtn" onclick="runOpportunity()">🎯 تحليل فرصة الفوز أولاً</button>
           <span class="muted" id="engineHint"></span>
         </div>
+        <div id="oppResult"></div>
         <div class="spinner" id="genSpinner">
           <div class="dot"></div>
           جارٍ تحليل وثائق المشروع وإعداد العرض الفني والمالي والخطة التنفيذية...<br>
@@ -172,6 +175,50 @@
         </div>
       </div>
       <div id="libraryList"></div>
+    </section>
+
+    <!-- المستودع المعرفي -->
+    <section class="page" id="page-repo">
+      <div class="page-head">
+        <div><h2>المستودع المعرفي</h2><p>ارفع أي عروض فنية ومالية قديمة — لعزوم أو لشركات أخرى ومنافسة — يستخرج النظام بنودها وأسعارها كأسعار سوق استرشادية، ويخزن محتواها لتطوير العروض القادمة وزيادة دقة التسعير وتغطية البنود</p></div>
+      </div>
+      <div class="panel">
+        <h3>رفع ملفات للمستودع</h3>
+        <div class="grid-3">
+          <div><label>نوع المصدر</label>
+            <select id="repoSource">
+              <option>عرض عزوم سابق</option>
+              <option>عرض شركة منافسة</option>
+              <option>عرض شركة أخرى</option>
+              <option>جدول كميات / كراسة شروط</option>
+              <option>قائمة أسعار موردين</option>
+            </select>
+          </div>
+          <div><label>اسم الشركة / المصدر</label><input type="text" id="repoCompany" placeholder="اختياري"></div>
+          <div><label>ملاحظات</label><input type="text" id="repoNotes" placeholder="اختياري"></div>
+        </div>
+        <label>الملفات (Excel / PDF / Word / نص)</label>
+        <div class="dropzone" id="repoDrop">
+          <div class="big">🗄️</div>
+          اسحب الملفات هنا أو اضغط للاختيار
+          <input type="file" id="repoFileInput" multiple hidden accept=".pdf,.docx,.xlsx,.xlsm,.txt,.md,.csv">
+        </div>
+        <div class="file-list" id="repoFileList"></div>
+        <div class="mt"><button class="btn gold" id="repoUploadBtn" onclick="uploadRepo()">📥 تحليل وتخزين في المستودع</button></div>
+        <div class="spinner" id="repoSpinner"><div class="dot"></div>جارٍ تحليل الملفات واستخراج البنود والأسعار...</div>
+      </div>
+      <div class="panel">
+        <h3>مقارنة أسعار السوق <span class="muted">— ابحث عن أي بند لمقارنة سعر عزوم بأسعار السوق المخزنة</span></h3>
+        <input type="text" id="marketSearch" placeholder="🔍 مثال: خرسانة، دهانات، تكييف..." style="max-width:320px" class="mb">
+        <div id="marketResult"></div>
+      </div>
+      <div class="panel">
+        <h3>محتويات المستودع</h3>
+        <div class="t-wrap"><table id="repoTable">
+          <thead><tr><th>الملف</th><th>المصدر</th><th>الشركة</th><th>بنود مسعّرة</th><th>تاريخ الرفع</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table></div>
+      </div>
     </section>
 
     <!-- وثائق الشركة -->

@@ -15,6 +15,8 @@ from .export_docx import export_proposal_docx
 from .export_xlsx import export_boq_xlsx
 from .file_extract import extract_text
 from .proposal_builder import build_template_proposal, compute_financials, match_price_catalog
+from .opportunity import analyze_opportunity
+from .repository import find_relevant_repo_texts, ingest_file
 from .seed import seed_if_empty
 from .similarity import find_similar, get_reference_content
 
@@ -168,6 +170,63 @@ def get_analytics():
     return compute_analytics()
 
 
+# ------------------------ المستودع المعرفي ------------------------
+
+@app.post("/api/repo/upload")
+async def repo_upload(
+    source_type: str = Form("عرض عزوم سابق"),
+    company: str = Form(""),
+    notes: str = Form(""),
+    files: list[UploadFile] = File(...),
+):
+    results = []
+    for f in files:
+        content = await f.read()
+        results.append(ingest_file(f.filename or "file", content, source_type, company, notes))
+    return results
+
+
+@app.get("/api/repo")
+def repo_list():
+    return {"files": db.list_repo_files(), "stats": db.market_stats()}
+
+
+@app.delete("/api/repo/{fid}")
+def repo_delete(fid: int):
+    db.delete_repo_file(fid)
+    return {"ok": True}
+
+
+@app.get("/api/market/search")
+def market_search(q: str):
+    """أسعار السوق من المستودع + سعر عزوم المعتمد للمقارنة."""
+    market = db.search_market_prices(q)
+    azoom = db.list_price_items(search=q)
+    prices = [m["unit_price"] for m in market]
+    bench = {
+        "count": len(prices),
+        "min": min(prices) if prices else None,
+        "avg": round(sum(prices) / len(prices), 2) if prices else None,
+        "max": max(prices) if prices else None,
+    }
+    return {"market": market, "azoom": azoom, "benchmark": bench}
+
+
+# ------------------------ تحليل فرصة الفوز ------------------------
+
+@app.post("/api/opportunity")
+async def opportunity(
+    title: str = Form(...),
+    client: str = Form(""),
+    files: list[UploadFile] = File(default=[]),
+):
+    texts = []
+    for f in files:
+        content = await f.read()
+        texts.append(extract_text(f.filename or "file", content))
+    return analyze_opportunity(title, client, "\n\n".join(texts))
+
+
 # ------------------------- توليد العروض وإدارتها -------------------------
 
 @app.post("/api/proposals/generate")
@@ -183,6 +242,17 @@ async def generate_proposal(
         extracted = extract_text(f.filename or "file", content)
         texts.append(f"===== الملف: {f.filename} =====\n{extracted}")
     files_text = "\n\n".join(texts)
+
+    # إثراء السياق من المستودع المعرفي (عروض قديمة/منافسة مخزنة)
+    repo_texts = find_relevant_repo_texts(f"{title}\n{files_text[:4000]}")
+    if repo_texts:
+        repo_block = "\n\n".join(
+            f"===== من المستودع المعرفي: {r['filename']} ({r['source_type']}"
+            + (f" — {r['company']}" if r['company'] else "") + ") =====\n"
+            + r["extracted_text"][:4000]
+            for r in repo_texts
+        )
+        files_text = f"{files_text}\n\n{repo_block}" if files_text else repo_block
 
     # البحث عن العروض السابقة الأشبه بنطاق المشروع — أساس بناء العرض الجديد
     matches = find_similar(f"{title}\n{files_text[:8000]}", top_n=3)

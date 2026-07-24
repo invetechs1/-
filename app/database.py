@@ -52,6 +52,29 @@ CREATE TABLE IF NOT EXISTS content_library (
     updated_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS repo_files (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    filename TEXT NOT NULL,
+    source_type TEXT NOT NULL DEFAULT 'عرض عزوم سابق',
+    company TEXT DEFAULT '',
+    notes TEXT DEFAULT '',
+    extracted_text TEXT DEFAULT '',
+    items_count INTEGER DEFAULT 0,
+    uploaded_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS market_prices (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    repo_file_id INTEGER REFERENCES repo_files(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    unit TEXT DEFAULT '',
+    unit_price REAL NOT NULL,
+    qty REAL,
+    source_company TEXT DEFAULT '',
+    source_type TEXT DEFAULT '',
+    created_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS company_docs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
@@ -326,6 +349,68 @@ def upsert_company_doc(doc: dict) -> dict:
 def delete_company_doc(doc_id: int):
     with get_db() as db:
         db.execute("DELETE FROM company_docs WHERE id = ?", (doc_id,))
+
+
+# ------------------------- المستودع المعرفي -------------------------
+
+def create_repo_file(meta: dict, extracted_text: str, items: list[dict]) -> dict:
+    ts = now_iso()
+    with get_db() as db:
+        cur = db.execute(
+            "INSERT INTO repo_files (filename, source_type, company, notes, extracted_text, items_count, uploaded_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (meta["filename"], meta.get("source_type", "عرض عزوم سابق"), meta.get("company", ""),
+             meta.get("notes", ""), extracted_text[:200_000], len(items), ts),
+        )
+        fid = cur.lastrowid
+        for it in items:
+            db.execute(
+                "INSERT INTO market_prices (repo_file_id, name, unit, unit_price, qty, source_company, source_type, created_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (fid, it["name"], it.get("unit", ""), it["unit_price"], it.get("qty"),
+                 meta.get("company", ""), meta.get("source_type", ""), ts),
+            )
+        row = db.execute("SELECT id, filename, source_type, company, notes, items_count, uploaded_at "
+                         "FROM repo_files WHERE id = ?", (fid,)).fetchone()
+    return dict(row)
+
+
+def list_repo_files() -> list[dict]:
+    with get_db() as db:
+        rows = db.execute(
+            "SELECT id, filename, source_type, company, notes, items_count, uploaded_at "
+            "FROM repo_files ORDER BY id DESC"
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_repo_texts(limit_chars: int = 4000) -> list[dict]:
+    with get_db() as db:
+        rows = db.execute("SELECT id, filename, source_type, company, extracted_text FROM repo_files").fetchall()
+    return [{**dict(r), "extracted_text": (r["extracted_text"] or "")[:limit_chars]} for r in rows]
+
+
+def delete_repo_file(fid: int):
+    with get_db() as db:
+        db.execute("DELETE FROM repo_files WHERE id = ?", (fid,))
+
+
+def search_market_prices(query: str, limit: int = 60) -> list[dict]:
+    with get_db() as db:
+        rows = db.execute(
+            "SELECT m.*, f.filename FROM market_prices m "
+            "LEFT JOIN repo_files f ON f.id = m.repo_file_id "
+            "WHERE m.name LIKE ? ORDER BY m.unit_price LIMIT ?",
+            (f"%{query}%", limit),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def market_stats() -> dict:
+    with get_db() as db:
+        row = db.execute("SELECT COUNT(*) AS n FROM market_prices").fetchone()
+        files = db.execute("SELECT COUNT(*) AS n FROM repo_files").fetchone()
+    return {"market_items": row["n"], "repo_files": files["n"]}
 
 
 def list_proposals_full() -> list[dict]:
