@@ -19,6 +19,7 @@
     <button class="nav-btn" data-page="proposals">🗂️ أرشيف العروض</button>
     <button class="nav-btn" data-page="prices">💰 قاعدة الأسعار</button>
     <button class="nav-btn" data-page="library">📚 المكتبة الفنية</button>
+    <button class="nav-btn" data-page="etimad">🏛️ منافسات اعتماد</button>
     <button class="nav-btn" data-page="repo">🗄️ المستودع المعرفي</button>
     <button class="nav-btn" data-page="docs">📄 وثائق الشركة</button>
     <button class="nav-btn" data-page="analytics">📈 التحليلات</button>
@@ -177,6 +178,32 @@
       <div id="libraryList"></div>
     </section>
 
+    <!-- منافسات اعتماد -->
+    <section class="page" id="page-etimad">
+      <div class="page-head">
+        <div><h2>منافسات اعتماد</h2><p>جلب المنافسات المطروحة من منصة اعتماد وترتيبها حسب ملاءمتها لنشاط عزوم — وافق على منافسة ليحلل النظام فرصتها ويبني عرضها</p></div>
+        <button class="btn gold" id="etimadFetchBtn" onclick="fetchEtimad()">⬇️ جلب المنافسات من اعتماد</button>
+      </div>
+      <div class="panel" id="etimadSessionNote" style="display:none">
+        <p class="muted">🔑 لتنزيل كراسات الشروط آلياً: شغّل من جهازك <code>python scripts/etimad_nafath_login.py</code> (دخول نفاذ بموافقتك من الجوال — رقم الهوية يُحفظ محلياً في إعداداتك فقط). جلب قائمة المنافسات لا يحتاج دخولاً.</p>
+      </div>
+      <div class="panel">
+        <div class="row mb">
+          <input type="text" id="etQ" placeholder="🔍 بحث بالاسم أو الجهة..." style="max-width:260px" oninput="loadEtimad()">
+          <select id="etStatus" onchange="loadEtimad()" style="max-width:180px">
+            <option value="">كل الحالات</option>
+            <option>جديدة</option><option>مهتمون</option><option>مستبعدة</option><option>أُنشئ عرض</option>
+          </select>
+          <label class="row" style="gap:6px;margin:0"><input type="checkbox" id="etRelevant" onchange="loadEtimad()" style="width:auto"> الملائمة لنشاط عزوم فقط</label>
+        </div>
+        <div class="spinner" id="etSpinner"><div class="dot"></div>جارٍ جلب المنافسات من منصة اعتماد...</div>
+        <div class="t-wrap"><table id="etimadTable">
+          <thead><tr><th>المنافسة</th><th>الجهة</th><th>آخر موعد للعروض</th><th>الملاءمة لعزوم</th><th>الحالة</th><th>إجراءات</th></tr></thead>
+          <tbody></tbody>
+        </table></div>
+      </div>
+    </section>
+
     <!-- المستودع المعرفي -->
     <section class="page" id="page-repo">
       <div class="page-head">
@@ -287,6 +314,7 @@
           <div><label>العنوان</label><input type="text" id="stAddr" data-key="company_address"></div>
           <div><label>الهاتف</label><input type="text" id="stPhone" data-key="company_phone"></div>
           <div><label>البريد الإلكتروني</label><input type="text" id="stEmail" data-key="company_email"></div>
+          <div><label>رقم الهوية لدخول اعتماد (نفاذ) — يُحفظ محلياً فقط</label><input type="text" data-key="etimad_national_id" placeholder="10XXXXXXXX"></div>
         </div>
       </div>
       <div class="panel">

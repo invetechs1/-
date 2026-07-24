@@ -17,6 +17,7 @@ function go(page) {
   if (page === "proposals") loadProposals();
   if (page === "prices") loadPrices();
   if (page === "library") loadLibrary();
+  if (page === "etimad") loadEtimad();
   if (page === "repo") loadRepo();
   if (page === "docs") loadDocs();
   if (page === "analytics") loadAnalytics();
@@ -435,6 +436,62 @@ async function removeLibrary(id) {
   if (!confirm("حذف هذا النص من المكتبة؟")) return;
   await api(`/api/library/${id}`, { method: "DELETE" });
   loadLibrary();
+}
+
+/* ---------- منافسات اعتماد ---------- */
+const ET_STATUSES = ["جديدة", "مهتمون", "مستبعدة", "أُنشئ عرض"];
+
+async function fetchEtimad() {
+  $("#etimadFetchBtn").disabled = true;
+  $("#etSpinner").classList.add("on");
+  try {
+    const r = await api("/api/etimad/fetch?pages=3", { method: "POST" });
+    if (r.ok) toast(`✅ فُحصت ${r.scanned} منافسة وأُضيفت ${r.added} جديدة`);
+    else toast(r.error, true);
+    loadEtimad();
+  } catch (err) {
+    toast("فشل الجلب: " + err.message, true);
+  } finally {
+    $("#etimadFetchBtn").disabled = false;
+    $("#etSpinner").classList.remove("on");
+  }
+}
+
+async function loadEtimad() {
+  const params = new URLSearchParams({
+    q: $("#etQ").value.trim(),
+    status: $("#etStatus").value,
+    min_relevance: $("#etRelevant").checked ? 15 : 0,
+  });
+  const data = await api(`/api/etimad?${params}`);
+  $("#etimadSessionNote").style.display = data.session ? "none" : "block";
+  $("#etimadTable tbody").innerHTML = data.tenders.map((t) => `
+    <tr>
+      <td><a href="${t.details_url}" target="_blank" rel="noopener" style="color:var(--primary);font-weight:600">${t.name.slice(0, 70)}</a>
+        ${t.matched_ref ? `<br><span class="muted" style="font-size:11px">أقرب خبرة: ${t.matched_ref.slice(0, 50)}</span>` : ""}</td>
+      <td>${t.agency.slice(0, 35)}</td>
+      <td class="num-cell">${t.deadline || "—"}</td>
+      <td><span class="tag ${t.relevance >= 30 ? "src" : t.relevance >= 15 ? "est" : "draft"}">${t.relevance}%</span></td>
+      <td><select onchange="setEtStatus(${t.id}, this.value)" style="padding:4px 8px;font-size:12px">
+        ${ET_STATUSES.map((s) => `<option ${s === t.status ? "selected" : ""}>${s}</option>`).join("")}</select></td>
+      <td>
+        <button class="btn sm ghost" onclick="etToProposal('${t.name.replace(/'/g, "&#39;").slice(0, 90)}', '${t.agency.replace(/'/g, "&#39;").slice(0, 60)}')">✨ أنشئ عرضاً</button>
+      </td>
+    </tr>`).join("") ||
+    `<tr><td colspan="6" class="muted">لا منافسات مخزنة — اضغط «جلب المنافسات من اعتماد» (يعمل من جهازك المتصل بالمنصة)</td></tr>`;
+}
+
+function setEtStatus(id, status) {
+  api(`/api/etimad/${id}`, { method: "PUT", json: { status } }).then(() => toast("تم تحديث الحالة"));
+}
+
+function etToProposal(name, agency) {
+  go("new");
+  $("#npTitle").value = name;
+  $("#npClient").value = agency;
+  $("#npEntity").value = "government";
+  suggestSimilar();
+  toast("حُمّلت بيانات المنافسة — ارفع كراسة الشروط بعد تنزيلها من اعتماد ثم اضغط توليد");
 }
 
 /* ---------- المستودع المعرفي ---------- */
